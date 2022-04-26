@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config1" doc:name="HTTP Listener config" doc:id="d303ba4c-0c7b-46db-b8e4-aa5106bea48e" basePath="/">
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="learn-additional-objects" doc:id="380bdde6-2f11-4dde-acbc-9c9d2189be7d" >
+		<http:listener doc:name="Listener" doc:id="054469e5-f800-46d9-bfe1-3e4b5451b80e" config-ref="HTTP_Listener_config1" path="/addObjects"/>
+		<logger level="INFO" doc:name="Logger" doc:id="7d87c200-7bb2-41fc-9cc9-725560306a88" message="#[payload]"/>
+		<set-variable value="#[0]" doc:name="Set Variable" doc:id="58459322-f399-4d61-a4d7-38dfe7ea74f7" variableName="test"/>
+		<ee:transform doc:name="Header_Check" doc:id="7b8aa771-02f3-4b1b-b36e-6fcc9c66300f" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Header_Check" ><![CDATA[%dw 2.0
+output application/java
+var rfpInvoice = flatten(flatten(payload.OriginalPayload.Invoice) filter(["Ready For Publishing"] contains $.PublishStatus.PublishStatusId ) map(inv)->{
+	
+	Invoice : inv
+	
+	// flatten((inv) reduce(item, acc -> acc + (item ++ { InvoiceNum : $$})))
+} 
+) 
+
+var payment = payload.OriginalPayload.Payment
+
+---
+{
+	saleReadyForPublishInvoice : rfpInvoice.Invoice.InvoiceType.InvoiceTypeId contains "Shipment",
+	returnReadyForPublishInvoice : rfpInvoice.Invoice.InvoiceType.InvoiceTypeId contains "Return",
+	adjustmentReadyForPublishInvoice : rfpInvoice.Invoice.InvoiceType.InvoiceTypeId contains "Adjustment"
+	
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="c08ce5d8-f587-4879-a435-5bd3613501ad" message="#[vars.Header_Check.saleReadyForPublishInvoice]"/>
+		<set-payload value='#[payload.OriginalPayload]' doc:name="Set Payload" doc:id="9624f70f-dc9f-4f94-913f-98e840ab716a" />
+		<ee:transform doc:name="Transform Message" doc:id="0651d495-6d15-4bf8-b95c-f11777e88f3f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.Invoice map (inv,ind_inv) -> {
+	OriginalPayload: ((payload - "Invoice") ++ {
+		"Invoice": [ inv ++ {"InvoiceNumber": ind_inv+1} ]
+	})
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="a90146cd-5feb-4d47-8610-ce0c320b7b10">
+			<logger level="INFO" doc:name="Logger" doc:id="d96acc89-d2ff-4948-b32e-5fa0362156ed" message="#[payload.Invoice.InvoiceId]" />
+			<choice doc:name="Choice" doc:id="8561a1e6-e41b-40d7-a932-6a4339777139">
+			<when expression="#[vars.Header_Check.saleReadyForPublishInvoice]">
+				<logger level="INFO" doc:name="Logger" doc:id="c2267569-ec01-4f4e-b70a-fc9fbf9c4bd5" message="#[payload.OriginalPayload.Invoice]" />
+				<ee:transform doc:name="Transform Message" doc:id="a054fdf5-9e8a-4e5e-940c-322d751df4d8">
+					<ee:message>
+						<ee:set-payload resource="dwl/saleShipment.dwl" />
+					</ee:message>
+				</ee:transform>
+			</when>
+			
+			<when expression="#[vars.Header_Check.returnReadyForPublishInvoice]">
+				<ee:transform doc:name="Transform Message" doc:id="9a2946de-9147-4270-8582-089f0cf0439e">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="0f5a9273-7856-4271-8cd2-b15c57c2aa41" message="*********** In Default choice ***********" />
+			</otherwise>
+		</choice>
+		</foreach>
+	</flow>
+</mule>

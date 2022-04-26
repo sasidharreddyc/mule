@@ -11,6 +11,7 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 	<flow name="learn-additional-objects" doc:id="380bdde6-2f11-4dde-acbc-9c9d2189be7d" >
 		<http:listener doc:name="Listener" doc:id="054469e5-f800-46d9-bfe1-3e4b5451b80e" config-ref="HTTP_Listener_config1" path="/addObjects"/>
 		<logger level="INFO" doc:name="Logger" doc:id="7d87c200-7bb2-41fc-9cc9-725560306a88" message="#[payload]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="29e8af91-1311-4d73-ba75-a0ec43680448" message="logger added for github******"/>
 		<set-variable value="#[0]" doc:name="Set Variable" doc:id="58459322-f399-4d61-a4d7-38dfe7ea74f7" variableName="test"/>
 		<ee:transform doc:name="Header_Check" doc:id="7b8aa771-02f3-4b1b-b36e-6fcc9c66300f" >
 			<ee:message >
